@@ -1,0 +1,3 @@
+[submodule "frost-bip340"]
+	path = frost-bip340
+	url = https://github.com/jesseposner/FROST-BIP340.git
