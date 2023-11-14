@@ -14,13 +14,25 @@ class ExtendedParticipant(FROST.Participant):
         #todo: rename to "enrolment_shares"
         self.aggregate_enrollment_share = None
 
-    # splits the secret (λ_i.s_i) into t additive shares
-    def generate_enrollment_shares(self, participant_indexes):
-        # λ_i.s_i = ∑ ẟ_j_i, 0 ≤ j ≤ t - 1
+    # generalization of `lagrange_coefficient` method
+    def eval_lagrange_basis_poly(self, participant_indexes, at_index):
+        Q = FROST.secp256k1.Q
+        # 𝓛_i(x) = ∏ (p_j - x)/(p_j - p_i), 1 ≤ j ≤ α, j ≠ i
+        numerator = 1
+        denominator = 1
+        for index in participant_indexes:
+            if index == self.index:
+                continue
+            numerator = numerator * (index - at_index)
+            denominator = denominator * (index - self.index)
+        return (numerator * pow(denominator, Q - 2, Q)) % Q
+
+    def generate_enrollment_shares(self, participant_indexes, new_participant_index):
         Q = FROST.secp256k1.Q
 
-        secret = self.lagrange_coefficient(participant_indexes) * self.aggregate_share % Q
-        # generate t random shares that sum to λ_i.s_i
+        # 𝓛_i(x).s_i = ∑ ẟ_j_i, 0 ≤ j ≤ t - 1
+        secret = self.eval_lagrange_basis_poly(participant_indexes, new_participant_index) * self.aggregate_share % Q
+        # generate t random shares that sum to 𝓛_i(x).s_i
         self.enrollment_shares = [0 for _ in range(self.participants)]
 
         for index in participant_indexes:
@@ -75,18 +87,19 @@ class EnrollmentTests(unittest.TestCase):
 
         # Enrollment Protocol
         participant_indexes = [1, 2]
+        # 2-of-3 becomes 2-of-4
+        p_new = ExtendedParticipant(index=len(participants)+1, threshold=2, participants=len(participants)+1)
+
         # Round 1.1
         for i in participant_indexes:
-            participants[i-1].generate_enrollment_shares(participant_indexes)
+            participants[i-1].generate_enrollment_shares(participant_indexes, p_new.index)
         # Round 1.2
         for i in participant_indexes:
             other_enroll_shares = [participants[j-1].enrollment_shares[i-1] for j in participant_indexes if j != i]
             participants[i-1].aggregate_enrollment_shares(participant_indexes, other_enroll_shares)
         # Round 2
-        # New participant enrolled, 2-of-3 becomes 2-of-4
-        p4 = ExtendedParticipant(index=len(participants)+1, threshold=2, participants=len(participants)+1)
         agg_enrollment_shares = [participants[i-1].aggregate_enrollment_share for i in participant_indexes]
-        p4.generate_frost_share(agg_enrollment_shares)
+        p_new.generate_frost_share(agg_enrollment_shares)
 
         # Later participants update n to n+1
         for p in participants:
@@ -96,7 +109,7 @@ class EnrollmentTests(unittest.TestCase):
         self.participants = participants
         self.pk = pk
         self.participant_indexes = participant_indexes
-        self.new_participant = p4
+        self.new_participant = p_new
 
     def test_generate_frost_share(self):
         Q = FROST.secp256k1.Q
