@@ -83,8 +83,8 @@ class EnrollmentTests(unittest.TestCase):
             other_enroll_shares = [participants[j-1].enrollment_shares[i-1] for j in participant_indexes if j != i]
             participants[i-1].aggregate_enrollment_shares(participant_indexes, other_enroll_shares)
         # Round 2
-        # New participant enrolled
-        p4 = ExtendedParticipant(index=4, threshold=2, participants=4)
+        # New participant enrolled, 2-of-3 becomes 2-of-4
+        p4 = ExtendedParticipant(index=len(participants)+1, threshold=2, participants=len(participants)+1)
         agg_enrollment_shares = [participants[i-1].aggregate_enrollment_share for i in participant_indexes]
         p4.generate_frost_share(agg_enrollment_shares)
 
@@ -99,8 +99,33 @@ class EnrollmentTests(unittest.TestCase):
         self.new_participant = p4
 
     def test_generate_frost_share(self):
-        # Reconstruct Secret
-        pass
+        Q = FROST.secp256k1.Q
+        G = FROST.secp256k1.G()
+
+        p1 = self.participants[0]
+        p2 = self.participants[1]
+        p3 = self.participants[2]
+        # new participant who joined through "Enrollment Protocol"
+        p_new = self.new_participant
+        participant_indexes = self.participant_indexes
+
+        # Reconstruct Secret with p1 & p2
+        l1 = p1.lagrange_coefficient([1, 2])
+        l2 = p2.lagrange_coefficient([1, 2])
+        secret = ((p1.aggregate_share * l1) + (p2.aggregate_share * l2)) % Q
+        self.assertEqual(secret * G, self.pk)
+
+        # Reconstruct Secret with p1 & p_new
+        l1 = p1.lagrange_coefficient([1, 4])
+        l_new = p_new.lagrange_coefficient([1, 4])
+        secret = ((p1.aggregate_share * l1) + (p_new.aggregate_share * l_new)) % Q
+        self.assertEqual(secret * G, self.pk)
+
+        # Reconstruct Secret with p3 & p_new
+        l3 = p3.lagrange_coefficient([3, 4])
+        l_new = p_new.lagrange_coefficient([3, 4])
+        secret = ((p3.aggregate_share * l3) + (p_new.aggregate_share * l_new)) % Q
+        self.assertEqual(secret * G, self.pk)
 
     def test_sign(self):
         # generate the new frost share
