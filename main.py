@@ -16,6 +16,7 @@ class ExtendedParticipant(FROST.Participant):
 
     # splits the secret (λ_i.s_i) into t additive shares
     def generate_enrollment_shares(self, participant_indexes):
+        # λ_i.s_i = ∑ ẟ_j_i, 0 ≤ j ≤ t - 1
         Q = FROST.secp256k1.Q
 
         secret = self.lagrange_coefficient(participant_indexes) * self.aggregate_share % Q
@@ -34,11 +35,19 @@ class ExtendedParticipant(FROST.Participant):
         assert(sum(self.enrollment_shares) % Q == secret)
 
     def aggregate_enrollment_shares(self, participant_indexes, enrollment_shares):
-        pass
+        # σ_i = ∑ ẟ_i_j, 0 ≤ j ≤ t - 1
+        aggregate = self.enrollment_shares[self.index - 1]
+        for share in enrollment_shares:
+            aggregate = aggregate + share
+        self.aggregate_enrollment_share = aggregate % FROST.secp256k1.Q
 
     def generate_frost_share(self, aggregate_enrollment_shares):
-        #TODO: don't forget to update `n` after creating a new enroll share
-        pass
+        s_i = sum(aggregate_enrollment_shares) % FROST.secp256k1.Q
+        self.aggregate_share = s_i
+
+    def increment_participants(self):
+        self.participants += 1
+
 
 class EnrollmentTests(unittest.TestCase):
     def test_generate_frost_share(self):
@@ -65,8 +74,19 @@ class EnrollmentTests(unittest.TestCase):
 
         # Enrollment Protocol
         participant_indexes = [1, 2]
+        # Round 1.1
         p1.generate_enrollment_shares(participant_indexes)
         p2.generate_enrollment_shares(participant_indexes)
+        # Round 1.2
+        p1.aggregate_enrollment_shares(participant_indexes, [p2.enrollment_shares[p1.index - 1]])
+        p2.aggregate_enrollment_shares(participant_indexes, [p1.enrollment_shares[p2.index - 1]])
+        # Round 2.1
+        # New participant enrolled
+        p4 = ExtendedParticipant(index=4, threshold=2, participants=4)
+        p4.generate_frost_share([p1.aggregate_enrollment_share, p2.aggregate_enrollment_share])
+        # Round 2.2
+        p1.increment_participants()
+        p2.increment_participants()
 
         # Reconstruct Secret
 
