@@ -22,3 +22,11 @@ To build the code:
 export PYTHONPATH=$PYTHONPATH:./frost-bip340
 python main.py
 ```
+To run the tests:
+```bash
+# runs all tests
+python -m unittest main.py
+
+# runs the sepecified test
+python -m unittest -k EnrollmentTests.<test-name> main.py
+```
