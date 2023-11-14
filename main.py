@@ -50,45 +50,57 @@ class ExtendedParticipant(FROST.Participant):
 
 
 class EnrollmentTests(unittest.TestCase):
-    def test_generate_frost_share(self):
-        p1 = ExtendedParticipant(index=1, threshold=2, participants=3)
-        p2 = ExtendedParticipant(index=2, threshold=2, participants=3)
-        p3 = ExtendedParticipant(index=3, threshold=2, participants=3)
+    def setUp(self):
+        participants = [ExtendedParticipant(index=i, threshold=2, participants=3) for i in range(1, 4)]
+        pk = None
 
-        # KeyGen
-        p1.init_keygen()
-        p2.init_keygen()
-        p3.init_keygen()
+        # KeyGen Protocol
+        for p in participants:
+            p.init_keygen()
 
-        p1.generate_shares()
-        p2.generate_shares()
-        p3.generate_shares()
+        for p in participants:
+            p.generate_shares()
+        # same as Round 2.3 in `test_keygen` fn (in frost-bip340/frost.py)
+        for i, pi in enumerate(participants):
+            other_shares = [pj.shares[i] for pj in participants if pj != pi]
+            pi.aggregate_shares(other_shares)
 
-        p1.aggregate_shares([p2.shares[p1.index-1], p3.shares[p1.index-1]])
-        p2.aggregate_shares([p1.shares[p2.index-1], p3.shares[p2.index-1]])
-        p3.aggregate_shares([p1.shares[p3.index-1], p2.shares[p3.index-1]])
-
-        p1.derive_public_key([p2.coefficient_commitments[0], p3.coefficient_commitments[0]])
-        p2.derive_public_key([p1.coefficient_commitments[0], p3.coefficient_commitments[0]])
-        pk = p3.derive_public_key([p1.coefficient_commitments[0], p2.coefficient_commitments[0]])
+        for i, pi in enumerate(participants):
+            other_coeff_commitments = [pj.coefficient_commitments[0] for pj in participants if pj != pi]
+            derived_pk = pi.derive_public_key(other_coeff_commitments)
+            if i == 0:
+                pk = derived_pk
+            else:
+                self.assertEqual(pk, derived_pk)
 
         # Enrollment Protocol
         participant_indexes = [1, 2]
         # Round 1.1
-        p1.generate_enrollment_shares(participant_indexes)
-        p2.generate_enrollment_shares(participant_indexes)
+        for i in participant_indexes:
+            participants[i-1].generate_enrollment_shares(participant_indexes)
         # Round 1.2
-        p1.aggregate_enrollment_shares(participant_indexes, [p2.enrollment_shares[p1.index - 1]])
-        p2.aggregate_enrollment_shares(participant_indexes, [p1.enrollment_shares[p2.index - 1]])
-        # Round 2.1
+        for i in participant_indexes:
+            other_enroll_shares = [participants[j-1].enrollment_shares[i-1] for j in participant_indexes if j != i]
+            participants[i-1].aggregate_enrollment_shares(participant_indexes, other_enroll_shares)
+        # Round 2
         # New participant enrolled
         p4 = ExtendedParticipant(index=4, threshold=2, participants=4)
-        p4.generate_frost_share([p1.aggregate_enrollment_share, p2.aggregate_enrollment_share])
-        # Round 2.2
-        p1.increment_participants()
-        p2.increment_participants()
+        agg_enrollment_shares = [participants[i-1].aggregate_enrollment_share for i in participant_indexes]
+        p4.generate_frost_share(agg_enrollment_shares)
 
+        # Later participants update n to n+1
+        for p in participants:
+            p.increment_participants()
+
+        # copy the values to setup
+        self.participants = participants
+        self.pk = pk
+        self.participant_indexes = participant_indexes
+        self.new_participant = p4
+
+    def test_generate_frost_share(self):
         # Reconstruct Secret
+        pass
 
     def test_sign(self):
         # generate the new frost share
