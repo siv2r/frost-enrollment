@@ -143,12 +143,39 @@ class EnrollmentTests(unittest.TestCase):
         self.assertEqual(secret * G, self.pk)
 
     def test_sign(self):
-        # generate the new frost share
-        # check if the sig using this new share is valid
-        pass
-    def test_not_in_keygen(self):
-        ## checks that new pariticpant was not in keygen
-        pass
+        p3 = self.participants[2]
+        p_new = self.new_participant
+        pk = self.pk
+
+        # NonceGen
+        p3.generate_nonces(1)
+        p_new.generate_nonces(1)
+
+        # Sign
+        msg = b'Hey p4, welcome to the world of threshold sigs!'
+        participant_indexes = [3, 4]
+        agg = FROST.Aggregator(pk, msg, [None, None, p3.nonce_commitment_pairs, p_new.nonce_commitment_pairs], participant_indexes)
+        message, nonce_commitment_pairs = agg.signing_inputs()
+
+        s3 = p3.sign(message, nonce_commitment_pairs, participant_indexes)
+        s_new = p_new.sign(message, nonce_commitment_pairs, participant_indexes)
+
+        # σ = (R, z)
+        sig = agg.signature([s3, s_new])
+        sig_bytes = bytes.fromhex(sig)
+        nonce_commitment = FROST.Point.xonly_deserialize(sig_bytes[0:32].hex())
+        z = int.from_bytes(sig_bytes[32:64], 'big')
+
+        # verify
+        G = FROST.secp256k1.G()
+        # c = H_2(R, Y, m)
+        challenge_hash = FROST.Aggregator.challenge_hash(nonce_commitment, pk, msg)
+        # Negate Y if Y.y is odd
+        if pk.y % 2 != 0:
+            pk = -pk
+
+        # R ≟ g^z * Y^-c
+        self.assertTrue(nonce_commitment == (z * G) + (FROST.secp256k1.Q - challenge_hash) * pk)
 
 if __name__ == '__main__':
     unittest.main()
