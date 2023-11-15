@@ -53,9 +53,10 @@ class ExtendedParticipant(FROST.Participant):
             aggregate = aggregate + share
         self.aggregate_enrollment_share = aggregate % FROST.secp256k1.Q
 
-    def generate_frost_share(self, aggregate_enrollment_shares):
+    def generate_frost_share(self, aggregate_enrollment_shares, group_public_key):
         s_i = sum(aggregate_enrollment_shares) % FROST.secp256k1.Q
         self.aggregate_share = s_i
+        self.public_key = group_public_key
 
     def increment_participants(self):
         self.participants += 1
@@ -84,6 +85,7 @@ class EnrollmentTests(unittest.TestCase):
                 pk = derived_pk
             else:
                 self.assertEqual(pk, derived_pk)
+        self.assertIsNotNone(pk)
 
         # Enrollment Protocol
         participant_indexes = [1, 2]
@@ -99,7 +101,7 @@ class EnrollmentTests(unittest.TestCase):
             participants[i-1].aggregate_enrollment_shares(participant_indexes, other_enroll_shares)
         # Round 2
         agg_enrollment_shares = [participants[i-1].aggregate_enrollment_share for i in participant_indexes]
-        p_new.generate_frost_share(agg_enrollment_shares)
+        p_new.generate_frost_share(agg_enrollment_shares, pk)
 
         # Later participants update n to n+1
         for p in participants:
