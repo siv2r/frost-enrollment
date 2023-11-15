@@ -177,5 +177,18 @@ class EnrollmentTests(unittest.TestCase):
         # R ≟ g^z * Y^-c
         self.assertTrue(nonce_commitment == (z * G) + (FROST.secp256k1.Q - challenge_hash) * pk)
 
+    def test_participant_not_in_dkg(self):
+        p_new = self.new_participant
+
+        # asserts participant was absent in DKG
+        self.assertListEqual(p_new.coefficients, [])
+        self.assertListEqual(p_new.coefficient_commitments, [])
+        self.assertListEqual(p_new.proof_of_knowledge, [])
+        self.assertListEqual(p_new.shares, [])
+
+        # asserts participant can participate in signing
+        self.assertIsNotNone(p_new.aggregate_share)
+        self.assertIsNotNone(p_new.public_key)
+
 if __name__ == '__main__':
     unittest.main()
