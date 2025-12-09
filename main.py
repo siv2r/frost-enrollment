@@ -2,6 +2,9 @@
 # BIP-340 compatible FROST implementation (by Jesse Posner).
 # Spec details: section 4.1.1 in https://eprint.iacr.org/2017/1155.pdf.
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'frost-bip340'))
 from frost import *
 import secrets
 import unittest
