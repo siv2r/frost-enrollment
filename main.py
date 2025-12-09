@@ -31,6 +31,16 @@ class ExtendedParticipant(FROST.Participant):
         return (numerator * pow(denominator, Q - 2, Q)) % Q
 
     def generate_enrollment_shares(self, participant_indexes, new_participant_index):
+        """Generate enrollment shares for a new participant joining the protocol.
+
+        This method implements Round 1.1 of the enrollment protocol. Each existing
+        participant generates t random shares that sum to 𝓛_i(x).s_i, where 𝓛_i(x)
+        is the Lagrange basis polynomial evaluated at the new participant's index.
+
+        Args:
+            participant_indexes: List of current participant indices
+            new_participant_index: Index of the new participant being enrolled
+        """
         Q = FROST.secp256k1.Q
 
         # 𝓛_i(x).s_i = ∑ ẟ_j_i, 0 ≤ j ≤ t - 1
@@ -47,18 +57,38 @@ class ExtendedParticipant(FROST.Participant):
         share_Pi = (secret - sum(self.enrollment_shares)) % Q
         self.enrollment_shares[self.index - 1] = share_Pi
 
-        assert(sum(self.enrollment_shares) % Q == secret)
+        # Verify shares sum to the expected secret
+        shares_sum = sum(self.enrollment_shares) % Q
+        if shares_sum != secret:
+            raise ValueError(f"Enrollment shares verification failed: sum={shares_sum}, expected={secret}")
 
     def aggregate_enrollment_shares(self, participant_indexes, enrollment_shares):
+        """Aggregate enrollment shares from other participants.
+
+        Args:
+            participant_indexes: List of participant indices involved in enrollment
+            enrollment_shares: List of enrollment shares received from other participants
+        """
         # σ_i = ∑ ẟ_i_j, 0 ≤ j ≤ t - 1
         aggregate = self.enrollment_shares[self.index - 1]
         for share in enrollment_shares:
-            aggregate = aggregate + share
+            aggregate += share
         self.aggregate_enrollment_share = aggregate % FROST.secp256k1.Q
 
     def generate_frost_share(self, aggregate_enrollment_shares, group_public_key):
-        s_i = sum(aggregate_enrollment_shares) % FROST.secp256k1.Q
-        self.aggregate_share = s_i
+        """Generate FROST share for the new participant.
+
+        This method allows a new participant to compute their aggregate share
+        from the enrollment shares received from existing participants.
+
+        Args:
+            aggregate_enrollment_shares: List of aggregate shares from existing participants
+            group_public_key: The group's public key from the original DKG
+        """
+        if not aggregate_enrollment_shares:
+            raise ValueError("Cannot generate FROST share: no enrollment shares provided")
+
+        self.aggregate_share = sum(aggregate_enrollment_shares) % FROST.secp256k1.Q
         self.public_key = group_public_key
 
     def increment_participants(self):
