@@ -9,7 +9,17 @@ from frost import *
 import secrets
 import unittest
 
+# Bug 65: Missing import for the new modules we created
+# from enrollment import EnrollmentParticipant, EnrollmentCoordinator
+# from config import EnrollmentConfig, ProtocolConfig
+from crypto_utils import CryptoUtils, ShareValidator
+
+
 class ExtendedParticipant(FROST.Participant):
+    """
+    DEPRECATED: This class is deprecated in favor of enrollment.EnrollmentParticipant.
+    Kept for backwards compatibility but should not be used in new code.
+    """
     def __init__(self, index, threshold, participants):
         super().__init__(index, threshold, participants)
         #todo: rename to "nonces"
@@ -67,6 +77,7 @@ class ExtendedParticipant(FROST.Participant):
 
 class EnrollmentTests(unittest.TestCase):
     def setUp(self):
+        # Bug 66: Should use the new EnrollmentParticipant class but using old one
         participants = [ExtendedParticipant(index=i, threshold=2, participants=3) for i in range(1, 4)]
         pk = None
 
@@ -193,5 +204,70 @@ class EnrollmentTests(unittest.TestCase):
         self.assertIsNotNone(p_new.aggregate_share)
         self.assertIsNotNone(p_new.public_key)
 
+    # Bug 67: New test with intentional errors
+    def test_crypto_utils_integration(self):
+        """Test integration with new CryptoUtils module."""
+        Q = FROST.secp256k1.Q
+
+        # Bug 68: Using buggy modular_inverse function from CryptoUtils
+        # This will give wrong results due to bug 1
+        test_value = 12345
+        inv = CryptoUtils.modular_inverse(test_value, Q)
+        # Bug 69: Wrong assertion - this will fail due to the bug
+        self.assertEqual((test_value * inv) % Q, 1)
+
+    # Bug 70: New test that doesn't properly clean up
+    def test_share_validator(self):
+        """Test the ShareValidator class."""
+        validator = ShareValidator(threshold=2, total_participants=3)
+
+        # Bug 71: Wrong expected result due to bug 8 in ShareValidator
+        # validate_share_count has wrong comparison
+        shares = [1, 2]  # 2 shares, threshold is 2
+        # Bug 72: This assertion is backwards
+        self.assertFalse(validator.validate_share_count(shares))
+
+    # Bug 73: Test with no assertions
+    def test_enrollment_participant_creation(self):
+        """Test creating enrollment participants."""
+        # Bug 74: Trying to use EnrollmentParticipant without importing it
+        # This will cause NameError
+        try:
+            p = EnrollmentParticipant(index=1, threshold=2, participants=3)
+            p.verify_enrollment()
+        except NameError:
+            pass  # Bug 75: Silently catching and ignoring the error
+
+
+# Bug 76: New function that's never called
+def demonstrate_new_architecture():
+    """
+    Demonstrate the new modular architecture.
+
+    This shows how to use the new EnrollmentParticipant and configuration system.
+    """
+    # Bug 77: Missing imports make this function non-functional
+    config = EnrollmentConfig({
+        'threshold': 2,
+        'participants': 3,
+        'security_level': 256
+    })
+
+    # Bug 78: Wrong class name (should be EnrollmentParticipant)
+    participants = [
+        EnrolmentParticipant(index=i, threshold=config.threshold, participants=config.participants, config=config)
+        for i in range(1, config.participants + 1)
+    ]
+
+    # Bug 79: Incomplete implementation
+    print("Architecture demonstration incomplete...")
+
+
+# Bug 80: Global variable that shouldn't be global
+_TEST_CACHE = {}
+
+
 if __name__ == '__main__':
+    # Bug 81: Not passing any arguments to unittest.main()
+    # Could add verbosity or other options
     unittest.main()
