@@ -29,68 +29,44 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
-            You are reviewing a pull request for a **reference implementation** of FROST threshold signatures (BIP-draft). This code prioritizes educational clarity over production security.
+            You are reviewing a pull request for a **reference implementation** of FROST threshold signatures (BIP-draft). This code prioritizes educational/specification clarity over production security.
 
-            1. Review Focus Areas (max 6 findings total):**
-               **Python Code Quality:**
-               - Clear, self-documenting function/variable names
-               - Appropriate abstraction levels
-               - Consistent patterns across the codebase
-               - Proper error handling with informative messages
-               - Type hints where they aid comprehension
-               - Docstrings that explain "why" not just "what"
+            1. Review the pull request
 
-               **Architecture & Design:**
-               - Single responsibility principle
-               - Clear module boundaries and interfaces
-               - Appropriate use of classes vs functions
-               - Data flow clarity
-               - Testability of the design
+            2. Categorize your findings:
+               2.1 INLINE findings (post as inline PR comments):
+                - Issues tied to specific lines of code
+                - Error handling at specific locations
+                - Code clarity issues in specific blocks
+                - Logical errors in functions/methods
+                - Documentation inaccuracies in specific sections
+                - NOTE: each of these should be posted as separate inline comments.
 
-               **README & Documentation:**
-               - Clear explanations accessible to developers (not academic papers)
-               - Practical examples that demonstrate usage
-               - Correct balance: precise enough to be accurate, simple enough to understand
-               - Logical flow from overview to details to examples
+               2.2 ARCHITECTURAL findings (post as single PR comment):
+                - Module organization suggestions
+                - Design pattern recommendations
+                - Cross-file structural issues
+                - Overall code change design feedback
 
-               **Explicitly skip:**
-               - Security/timing attacks (this is reference code with disclaimers)
-               - Style nitpicks and formatting
-               - Performance micro-optimizations
-               - Obvious WIP items the author knows about
-
-            2. Categorize your findings:**
-               **INLINE findings** (post as inline PR comments):
-               - Issues tied to specific lines of code
-               - Function/variable naming suggestions
-               - Docstring improvements
-               - Error handling at specific locations
-               - Code clarity issues in specific blocks
-
-               **ARCHITECTURAL findings** (post as single PR comment):
-               - Module organization suggestions
-               - Design pattern recommendations
-               - Cross-file structural issues
-               - Overall API design feedback
-               - README structure/flow suggestions that span multiple sections
-
-            3. Submit review:**
-               Step A: Inline comments (if any):
+            3. Submit review:
+              3.1 Inline comments (if any):
                  gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments \
                    -X POST \
                    -f commit_id="${{ github.event.pull_request.head.sha }}" \
                    -f path="FILE_PATH" \
                    -f line=LINE_NUMBER \
-                   -f body="**[Severity]** Issue description"
+                   -f body="**[Severity]** Inline comment description here ..."
 
-               Step B: Architectural comment (only if needed):
+              3.2 IMPORTANT: Repeat 3.1.for every inline finding
+
+              3.3 Architectural comment (only if needed):
                  gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
                    -X POST \
-                   -f body="## Architecture & Design Suggestions ..."
+                   -f body="Architecture comment description here ..."
 
-               Step C: If no findings, post nothing.
+              3.4 If no findings, post nothing.
 
           claude_args: |
             --model claude-sonnet-4-5-20250929
-            --max-turns 25
+            --max-turns 50
             --allowedTools "Read,Grep,Glob,WebSearch,WebFetch,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Bash(git log:*),Bash(git show:*)"
