@@ -2,26 +2,14 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+    types: [opened, synchronize, reopened]
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write
       issues: read
       id-token: write
 
@@ -37,21 +25,72 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
+            /review
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
-            Please review this pull request and provide feedback on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
+            You are reviewing a pull request for a **reference implementation** of FROST threshold signatures (BIP-draft). This code prioritizes educational clarity over production security.
 
-            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+            1. Review Focus Areas (max 6 findings total):**
+               **Python Code Quality:**
+               - Clear, self-documenting function/variable names
+               - Appropriate abstraction levels
+               - Consistent patterns across the codebase
+               - Proper error handling with informative messages
+               - Type hints where they aid comprehension
+               - Docstrings that explain "why" not just "what"
 
-            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
+               **Architecture & Design:**
+               - Single responsibility principle
+               - Clear module boundaries and interfaces
+               - Appropriate use of classes vs functions
+               - Data flow clarity
+               - Testability of the design
 
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+               **README & Documentation:**
+               - Clear explanations accessible to developers (not academic papers)
+               - Practical examples that demonstrate usage
+               - Correct balance: precise enough to be accurate, simple enough to understand
+               - Logical flow from overview to details to examples
 
+               **Explicitly skip:**
+               - Security/timing attacks (this is reference code with disclaimers)
+               - Style nitpicks and formatting
+               - Performance micro-optimizations
+               - Obvious WIP items the author knows about
+
+            2. Categorize your findings:**
+               **INLINE findings** (post as inline PR comments):
+               - Issues tied to specific lines of code
+               - Function/variable naming suggestions
+               - Docstring improvements
+               - Error handling at specific locations
+               - Code clarity issues in specific blocks
+
+               **ARCHITECTURAL findings** (post as single PR comment):
+               - Module organization suggestions
+               - Design pattern recommendations
+               - Cross-file structural issues
+               - Overall API design feedback
+               - README structure/flow suggestions that span multiple sections
+
+            3. Submit review:**
+               Step A: Inline comments (if any):
+                 gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments \
+                   -X POST \
+                   -f commit_id="${{ github.event.pull_request.head.sha }}" \
+                   -f path="FILE_PATH" \
+                   -f line=LINE_NUMBER \
+                   -f body="**[Severity]** Issue description"
+
+               Step B: Architectural comment (only if needed):
+                 gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+                   -X POST \
+                   -f body="## Architecture & Design Suggestions ..."
+
+               Step C: If no findings, post nothing.
+
+          claude_args: |
+            --model claude-sonnet-4-5-20250929
+            --max-turns 25
+            --allowedTools "Read,Grep,Glob,WebSearch,WebFetch,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Bash(git log:*),Bash(git show:*)"
